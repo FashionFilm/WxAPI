@@ -12,7 +12,11 @@ libraryDependencies ++= Seq(
   jdbc,
   cache,
   ws,
-  specs2 % Test
+  specs2 % Test,
+  "com.fasterxml.jackson.core" % "jackson-databind" % "2.7.0",
+  "com.fasterxml.jackson.core" % "jackson-annotations" % "2.7.0",
+  "com.fasterxml.jackson.core" % "jackson-core" % "2.7.0",
+  "com.typesafe.play.modules" %% "play-modules-redis" % "2.4.0"
 )
 
 resolvers += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
@@ -22,4 +26,4 @@ resolvers += "scalaz-bintray" at "http://dl.bintray.com/scalaz/releases"
 routesGenerator := InjectedRoutesGenerator
 
 
-fork in run := true
+// fork in run := true
