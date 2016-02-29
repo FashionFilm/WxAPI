@@ -6,14 +6,14 @@ import javax.inject.Inject
 import core.CoreApi
 import play.api.cache.CacheApi
 import play.api.mvc._
-import play.api.{Logger, Play}
+import play.api.{ Logger, Play }
 import play.cache.NamedCache
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.xml.{NodeSeq, PCData}
+import scala.xml.{ NodeSeq, PCData }
 
-class Application @Inject()(@NamedCache("redis-cache") redisCache: CacheApi) extends Controller {
+class Application @Inject() (@NamedCache("redis-cache") redisCache: CacheApi) extends Controller {
 
   Logger.debug("Controller Application initialized")
 
@@ -24,9 +24,9 @@ class Application @Inject()(@NamedCache("redis-cache") redisCache: CacheApi) ext
   }
 
   /**
-    * 验证服务器地址的有效性
-    * @return
-    */
+   * 验证服务器地址的有效性
+   * @return
+   */
   def serverValidation = Action.async(request => {
     // 获得token
     val token = (Play.current.configuration getString "token").get
@@ -60,32 +60,57 @@ class Application @Inject()(@NamedCache("redis-cache") redisCache: CacheApi) ext
     Results.Ok(result) //withHeaders ("Content-Type" -> "text/xml; charset=utf-8")
   }
 
+  /**
+   * 构造一条文本信息回复
+   * @param sender
+   * @param receiver
+   * @param content
+   * @return
+   */
+  def buildTextMessage(sender: String, receiver: String, content: String): NodeSeq =
+    <xml>
+      <ToUserName>
+        { PCData(receiver) }
+      </ToUserName>
+      <FromUserName>
+        { PCData(sender) }
+      </FromUserName>
+      <CreateTime>
+        { System.currentTimeMillis() / 1000 }
+      </CreateTime>
+      <MsgType>
+        { PCData("text") }
+      </MsgType>
+      <Content>
+        { PCData(content) }
+      </Content>
+    </xml>
+
+  /**
+   * 处理用户发送文本信息的事件
+   * @param data
+   * @return
+   */
   def receivedTextMessage(data: NodeSeq): Future[NodeSeq] = {
-    val fromUser = PCData((data \ "FromUserName").text)
-    val toUser = PCData((data \ "ToUserName").text)
+    val fromUser = (data \ "FromUserName").text
+    val toUser = (data \ "ToUserName").text
     val contents = (data \ "Content").text
-    val reply = PCData(s"你刚刚说：$contents")
+    val reply = s"你刚刚说：$contents"
 
-    val result =
-      <xml>
-        <ToUserName>
-          {fromUser}
-        </ToUserName>
-        <FromUserName>
-          {toUser}
-        </FromUserName>
-        <CreateTime>
-          {System.currentTimeMillis() / 1000}
-        </CreateTime>
-        <MsgType>
-          {PCData("text")}
-        </MsgType>
-        <Content>
-          {reply}
-        </Content>
-      </xml>
+    Future.successful(buildTextMessage(toUser, fromUser, reply))
+  }
 
-    Future.successful(result)
+  /**
+   * 处理用户订阅事件
+   * @param data
+   * @return
+   */
+  def onSubscribe(data: NodeSeq): Future[NodeSeq] = {
+    val fromUser = (data \ "FromUserName").text
+    val toUser = (data \ "ToUserName").text
+    val reply = "欢迎关注时尚胶片！"
+
+    Future.successful(buildTextMessage(toUser, fromUser, reply))
   }
 
   def entry() = Action.async(BodyParsers.parse.raw)(
@@ -93,16 +118,18 @@ class Application @Inject()(@NamedCache("redis-cache") redisCache: CacheApi) ext
       val raw = request.body.asBytes() getOrElse new Array(0)
       val requestXml = scala.xml.XML.loadString(new String(raw, "utf-8"))
 
-      requestXml match {
-        case nodeSeq: NodeSeq =>
-          // 消息种类
-          val msgType = (nodeSeq \ "MsgType").text
-          msgType match {
-            case "text" =>
-              val r = receivedTextMessage(requestXml) map wrapXmlResult
-              r map (v => {
-                v
-              })
+      // 消息种类
+      val msgType = (requestXml \ "MsgType").text
+      msgType match {
+        case "text" =>
+          val r = receivedTextMessage(requestXml) map wrapXmlResult
+          r map (v => {
+            v
+          })
+        case "event" =>
+          (requestXml \ "Event").text match {
+            case "subscribe" =>
+              onSubscribe(requestXml) map wrapXmlResult
             case _ =>
               Future.successful(Results.Ok("success"))
           }
