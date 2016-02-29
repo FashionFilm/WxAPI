@@ -5,19 +5,20 @@ import javax.inject.Inject
 import com.fasterxml.jackson.databind.ObjectMapper
 import play.api.cache.CacheApi
 import play.api.libs.ws.WSClient
-import play.api.{ Logger, Play }
+import play.api.{ Configuration, Environment, Logger }
 import play.cache.NamedCache
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.Try
-import scala.concurrent.ExecutionContext.Implicits.global
 
 /**
  * Created by zephyre on 2/29/16.
  */
 class CoreApi @Inject() (
     @NamedCache("redis-cache") redisCache: CacheApi,
-    ws: WSClient
+    ws: WSClient,
+    environment: Environment
 ) {
 
   Logger.debug("CoreApi initialized")
@@ -35,8 +36,9 @@ class CoreApi @Inject() (
         Logger.debug("Cached missed. Trying to generat a new token.")
 
         // 从cache中没有获得access token, 尝试从微信服务器获得
-        val appid = (Play.current.configuration getString "appid").get
-        val secret = (Play.current.configuration getString "secret").get
+        val configuration = Configuration.load(environment)
+        val appid = (configuration getString "appid").get
+        val secret = (configuration getString "secret").get
         val url = s"https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=$appid&secret=$secret"
 
         ws.url(url).get map (response => {

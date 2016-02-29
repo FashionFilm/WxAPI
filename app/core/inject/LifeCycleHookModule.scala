@@ -25,7 +25,8 @@ trait LifeCycleHook
 
 @Singleton
 class LifeCycleHookImpl @Inject() (
-    ws: WSClient, coreApi: CoreApi,
+    ws: WSClient,
+    coreApi: CoreApi,
     environment: Environment
 ) extends LifeCycleHook {
   {
@@ -44,9 +45,6 @@ class LifeCycleHookImpl @Inject() (
     val homeButton = mapper.createObjectNode() put ("type", "view") put ("name", "时尚搜索") put
       ("url", "http://fashionfilm.quantumex.cn/")
     val menu = mapper.createObjectNode() set ("button", mapper.createArrayNode() add homeButton)
-
-    //    val coreApi = Play.current.injector instanceOf classOf[CoreApi]
-    //    val ws = Play.current.injector instanceOf classOf[WSClient]
 
     val future = (for {
       accessToken <- coreApi.accessToken()
